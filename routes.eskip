@@ -1,0 +1,330 @@
+// This operation implements binary increment. It uses a bit pointer represented by '<'. It flips the current
+// bit, and moves the '<' pointer to the next, higher position.
+//
+Inc: PathSubtree("/inc") && PathRegexp("^/inc/[0-9]+$")
+	-> modPath("^/inc/([0-9]+)", "/_base2/0/d$1/_inc/_ret")
+	-> <loopback>;
+incRet: PathSubtree("/_inc/_ret")
+	-> modPath("^/_inc/_ret/([01]+)", "/_inc/$1/_print-decimal")
+	-> <loopback>;
+inc: PathSubtree("/_inc") && PathRegexp("^/_inc/[01]+/")
+	-> modPath("^/_inc/([01]+)/", "/_inc/$1</")
+	-> <loopback>;
+incOne: PathSubtree("/_inc") && PathRegexp("0<")
+	-> modPath("0<", "1")
+	-> modPath("^/_inc/([01]+)/(.*)", "/$2/$1")
+	-> <loopback>;
+incCarry: PathSubtree("/_inc") && PathRegexp("1<")
+	-> modPath("1<", "<0")
+	-> <loopback>;
+incDone: PathSubtree("/_inc") && PathRegexp("/<")
+	-> modPath("^/_inc/<([01]+)/(.*)", "/$2/1$1")
+	-> <loopback>;
+
+// This operation implements binary decrement. It uses a bit pointer represented by '<'. It flips the current
+// bit, and moves the '<' pointer to the next, higher position. The decrement of 0 is considered 0, since we
+// don't handle negative numbers here.
+//
+Dec: PathSubtree("/dec") && PathRegexp("^/dec/[0-9]+$")
+	-> modPath("^/dec/([0-9]+)", "/_base2/0/d$1/_dec/_ret")
+	-> <loopback>;
+decRet: PathSubtree("/_dec/_ret")
+	-> modPath("^/_dec/_ret/([01]+)", "/_dec/$1/_print-decimal")
+	-> <loopback>;
+dec: PathSubtree("/_dec") && PathRegexp("^/_dec/[01]+/")
+	-> modPath("^/_dec/([01]+)/", "/_dec/$1</")
+	-> <loopback>;
+decZero: PathSubtree("/_dec") && PathRegexp("^/_dec/0+</")
+	-> modPath("/_dec/0+/(.*)", "/$1/0")
+	-> <loopback>;
+decOne: PathSubtree("/_dec") && PathRegexp("1<")
+	-> modPath("1<", "0")
+	-> modPath("^/_dec/([01]+)/(.*)", "/$2/$1")
+	-> <loopback>;
+decCarry: PathSubtree("/_dec") && PathRegexp("0<")
+	-> modPath("0<", "<1")
+	-> <loopback>;
+decDone: PathSubtree("/_dec") && PathRegexp("/<")
+	-> modPath("^/_dec/<(.*)/(.*)", "/$2/0")
+	-> <loopback>;
+
+// This operation implements addition of two binary numbers and works akin to:
+//
+// 	loop:
+// 		if b == 0:
+// 			return a
+// 		inc(a)
+// 		dec(b)
+//
+Add: PathSubtree("/add") && PathRegexp("^/add/[0-9]+/[0-9]+$")
+	-> modPath("^/add/([0-9]+)/([0-9]+)", "/_base2/0/d$1/_base2/0/d$2/_add/_ret0")
+	-> <loopback>;
+addRet0: PathSubtree("/_add/_ret0")
+	-> modPath("/_add/_ret0/([01]+/[01]+)", "/_add/$1/_print-decimal")
+	-> <loopback>;
+addZero: PathSubtree("/_add") && PathRegexp("^/_add/[01]+/0+/")
+	-> modPath("^/_add/([01]+)/0+/(.*)", "/$2/$1")
+	-> <loopback>;
+addOne: PathSubtree("/_add") && PathRegexp("^/_add/[01]+/[01]*1[01]*/")
+	-> modPath("^/_add/([01]+)/([01]+)/(.*)", "/_inc/$1/_dec/$2/_add/_ret1/$3")
+	-> <loopback>;
+addRet1: PathSubtree("/_add/_ret1")
+	-> modPath("^/_add/_ret1/(.*)/([01]+)/([01]+)$", "/_add/$2/$3/$1")
+	-> <loopback>;
+
+// This operation implements subtraction of two binary numbers and works akin to:
+//
+// 	loop:
+// 		if a == 0:
+// 			return a
+// 		if b == 0:
+// 			return a
+// 		dec(a)
+// 		dec(b)
+//
+Sub: PathSubtree("/sub") && PathRegexp("^/sub/[0-9]+/[0-9]+$")
+	-> modPath("/sub/([0-9]+)/([0-9]+)", "/_base2/0/d$1/_base2/0/d$2/_sub/_ret0")
+	-> <loopback>;
+subRet0: PathSubtree("/_sub/_ret0")
+	-> modPath("/_sub/_ret0/([01]+/[01]+)", "/_sub/$1/_print-decimal")
+	-> <loopback>;
+subZero: PathSubtree("/_sub") && PathRegexp("^/_sub/(0+/[01]+|[01]+/0+)/")
+	-> modPath("^/_sub/([01]+)/[01]+/(.*)", "/$2/$1")
+	-> <loopback>;
+subOne: PathSubtree("/_sub") && PathRegexp("^/_sub/[01]*1[01]*/[01]*1[01]*/")
+	-> modPath("^/_sub/([01]+)/([01]+)/(.*)", "/_dec/$1/_dec/$2/_sub/_ret1/$3")
+	-> <loopback>;
+subRet1: PathSubtree("/_sub/_ret1")
+	-> modPath("^/_sub/_ret1/(.*)/([01]+)/([01]+)$", "/_sub/$2/$3/$1")
+	-> <loopback>;
+
+// This operation implements multiplication of two binary numbers and works akin to:
+//
+// 	set result 0
+// 	loop:
+// 		if a == 0 || b == 0:
+// 			return result
+// 		add(result, a)
+// 		dec(b)
+//
+Mul: PathSubtree("/mul") && PathRegexp("^/mul/[0-9]+/[0-9]+$")
+	-> modPath("^/mul/([0-9]+)/([0-9]+)", "/_base2/0/d$1/_base2/0/d$2/_mul/_ret0")
+	-> <loopback>;
+mulRet0: PathSubtree("/_mul/_ret0")
+	-> modPath("/_mul/_ret0/([01]+)/([01]+)", "/_mul/0/$1/$2/_print-decimal")
+	-> <loopback>;
+mulZero: PathSubtree("/_mul") && PathRegexp("^/_mul/[01]+/(0+/[01]+|[01]+/0+)/")
+	-> modPath("/_mul/([01]+)/[01]+/[01]+/(.*)", "/$2/$1")
+	-> <loopback>;
+mulOne: PathSubtree("/_mul") && PathRegexp("^/_mul/[01]+/[01]*1[01]*/[01]*1[01]*/")
+	-> modPath("/_mul/([01]+)/([01]+)/([01]+)/(.*)", "/_add/$1/$2/_dec/$3/_mul/_ret1/$4/$2")
+	-> <loopback>;
+mulRet1: PathSubtree("/_mul/_ret1")
+	-> modPath("/_mul/_ret1/(.*)/([01]+)/([01]+)/([01]+)$", "/_mul/$3/$2/$4/$1")
+	-> <loopback>;
+
+// This operation implements division of two binary numbers and works akin to:
+//
+// 	if b == 0:
+// 		return ERR
+// 	set result 0
+// 	loop:
+// 		set c a
+// 		sub(a, b)
+// 		if a == 0:
+// 			inc(c)
+// 			sub(c, b)
+// 			if c == 0:
+// 				return result
+// 			inc(result)
+// 			return result
+// 		inc(result)
+//
+Div: PathSubtree("/div") && PathRegexp("^/div/[0-9]+/[0-9]+$")
+	-> modPath("^/div/([0-9]+)/([0-9]+)", "/_base2/0/d$1/_base2/0/d$2/_div/_ret0")
+	-> <loopback>;
+devRet0: PathSubtree("/_div/_ret0")
+	-> modPath("/_div/_ret0/([01]+)/([01]+)", "/_div/0/$1/$2/_print-decimal")
+	-> <loopback>;
+divByZero: PathSubtree("/_div") && PathRegexp("^/_div/[01]+/[01]+/0+/")
+	-> modPath("^/_div/[01]+/[01]+/[01]+/(.*)", "/$1/ERR")
+	-> <loopback>;
+divOne: PathSubtree("/_div") && PathRegexp("^/_div/[01]+/[01]+/[01]*1[01]*/")
+	-> modPath("^/_div/([01]+)/([01]+)/([01]+)/(.*)", "/_sub/$2/$3/_div/_ret1/$4/$1/$2/$3")
+	-> <loopback>;
+divRet1Zero: PathSubtree("/_div/_ret1") && PathRegexp("^/_div/_ret1/.*/[01]+/[01]+/[01]+/0+$")
+	-> modPath("^/_div/_ret1/(.*)/([01]+)/([01]+)/([01]+)/[01]+$", "/_inc/$3/_div/_ret2/$1/$2/$4")
+	-> <loopback>;
+divRet2: PathSubtree("/_div/_ret2")
+	-> modPath("^/_div/_ret2/(.*)/([01]+)/([01]+)/([01]+)$", "/_sub/$4/$3/_div/_ret3/$1/$2")
+	-> <loopback>;
+divRet3Zero: PathSubtree("/_div/_ret3") && PathRegexp("^/_div/_ret3/.*/[01]+/0+$")
+	-> modPath("^/_div/_ret3/(.*)/([01]+)/[01]+$", "/$1/$2")
+	-> <loopback>;
+divRet3: PathSubtree("/_div/_ret3") && PathRegexp("^/_div/_ret3/.*/[01]+/[01]*1[01]*$")
+	-> modPath("^/_div/_ret3/(.*)/([01]+)/[01]+$", "/_inc/$2/_div/_ret4/$1")
+	-> <loopback>;
+divRet4: PathSubtree("/_div/_ret4")
+	-> modPath("^/_div/_ret4/(.*)/([01]+)$", "/$1/$2")
+	-> <loopback>;
+divRet1: PathSubtree("/_div/_ret1") && PathRegexp("^/_div/_ret1/.*/[01]+/[01]+/[01]+/[01]*1[01]*$")
+	-> modPath("^/_div/_ret1/(.*)/([01]+)/[01]+/([01]+)/([01]+)$", "/_inc/$2/_div/_ret5/$1/$4/$3")
+	-> <loopback>;
+divRet5: PathSubtree("/_div/_ret5") && PathRegexp("^/_div/_ret5/.*/[01]+/[01]+/[01]+$")
+	-> modPath("^/_div/_ret5/(.*)/([01]+)/([01]+)/([01]+)$", "/_div/$4/$2/$3/$1")
+	-> <loopback>;
+
+// This operation converts decimal numbers into their binary representation.
+//
+// set result 0
+// loop:
+// 	if a == "":
+// 		return result
+// 	mul(result, 1010)
+// 	add(result, base2OfDigit(first(a)))
+//       shift(a)
+//
+base2Zero: PathSubtree("/_base2/_digit/0")
+	-> modPath("^/_base2/_digit/0/(.*)", "/$1/0")
+	-> <loopback>;
+base2One: PathSubtree("/_base2/_digit/1")
+	-> modPath("^/_base2/_digit/1/(.*)", "/$1/1")
+	-> <loopback>;
+base2Two: PathSubtree("/_base2/_digit/2")
+	-> modPath("^/_base2/_digit/2/(.*)", "/$1/10")
+	-> <loopback>;
+base2Three: PathSubtree("/_base2/_digit/3")
+	-> modPath("^/_base2/_digit/3/(.*)", "/$1/11")
+	-> <loopback>;
+base2Four: PathSubtree("/_base2/_digit/4")
+	-> modPath("^/_base2/_digit/4/(.*)", "/$1/100")
+	-> <loopback>;
+base2Five: PathSubtree("/_base2/_digit/5")
+	-> modPath("^/_base2/_digit/5/(.*)", "/$1/101")
+	-> <loopback>;
+base2Six: PathSubtree("/_base2/_digit/6")
+	-> modPath("^/_base2/_digit/6/(.*)", "/$1/110")
+	-> <loopback>;
+base2Seven: PathSubtree("/_base2/_digit/7")
+	-> modPath("^/_base2/_digit/7/(.*)", "/$1/111")
+	-> <loopback>;
+base2Eight: PathSubtree("/_base2/_digit/8")
+	-> modPath("^/_base2/_digit/8/(.*)", "/$1/1000")
+	-> <loopback>;
+base2Nine: PathSubtree("/_base2/_digit/9")
+	-> modPath("^/_base2/_digit/9/(.*)", "/$1/1001")
+	-> <loopback>;
+base2Done: PathSubtree("/_base2") && PathRegexp("^/_base2/[01]+/d/")
+	-> modPath("^/_base2/([01]+)/d/(.*)", "/$2/$1")
+	-> <loopback>;
+base2Shift: PathSubtree("/_base2") && PathRegexp("^/_base2/[01]+/d[0-9]+/")
+	-> modPath("^/_base2/([01]+)/(d[0-9]+)/(.*)", "/_mul/0/$1/1010/_base2/_ret1/$3/$2")
+	-> <loopback>;
+base2Ret1: PathSubtree("/_base2/_ret1")
+	-> modPath("^/_base2/_ret1/(.*)/d([0-9])([0-9]*)/([01]+)$", "/_base2/_digit/$2/_base2/_ret2/$1/$4/d$3")
+	-> <loopback>;
+base2Ret2: PathSubtree("/_base2/_ret2")
+	-> modPath("^/_base2/_ret2/(.*)/([01]+)/(d[0-9]*)/([01]+)$", "/_add/$2/$4/_base2/_ret3/$1/$3")
+	-> <loopback>;
+base2Ret3: PathSubtree("/_base2/_ret3")
+	-> modPath("^/_base2/_ret3/(.*)/(d[0-9]*)/([01]+)$", "/_base2/$3/$2/$1")
+	-> <loopback>;
+
+// This operation converts binary numbers into their decimal representation.
+//
+// set result ""
+// loop:
+// 	set b div(a, 1010)
+// 	set c mul(b, 1010)
+// 	prepend(result, decimalDigit(sub(a, c)))
+// 	set a b
+// 	if a == 0:
+// 		return result
+//
+decimalZero: PathSubtree("/_decimal/_digit") && PathRegexp("^/_decimal/_digit/0+/")
+	-> modPath("^/_decimal/_digit/[0-1]+/(.*)", "/$1/0")
+	-> <loopback>;
+decimalOne: PathSubtree("/_decimal/_digit") && PathRegexp("^/_decimal/_digit/0*1/")
+	-> modPath("^/_decimal/_digit/[0-1]+/(.*)", "/$1/1")
+	-> <loopback>;
+decimalTwo: PathSubtree("/_decimal/_digit") && PathRegexp("^/_decimal/_digit/0*10/")
+	-> modPath("^/_decimal/_digit/[0-1]+/(.*)", "/$1/2")
+	-> <loopback>;
+decimalThree: PathSubtree("/_decimal/_digit") && PathRegexp("^/_decimal/_digit/0*11/")
+	-> modPath("^/_decimal/_digit/[0-1]+/(.*)", "/$1/3")
+	-> <loopback>;
+decimalFour: PathSubtree("/_decimal/_digit") && PathRegexp("^/_decimal/_digit/0*100/")
+	-> modPath("^/_decimal/_digit/[0-1]+/(.*)", "/$1/4")
+	-> <loopback>;
+decimalFive: PathSubtree("/_decimal/_digit") && PathRegexp("^/_decimal/_digit/0*101/")
+	-> modPath("^/_decimal/_digit/[0-1]+/(.*)", "/$1/5")
+	-> <loopback>;
+decimalSix: PathSubtree("/_decimal/_digit") && PathRegexp("^/_decimal/_digit/0*110/")
+	-> modPath("^/_decimal/_digit/[0-1]+/(.*)", "/$1/6")
+	-> <loopback>;
+decimalSeven: PathSubtree("/_decimal/_digit") && PathRegexp("^/_decimal/_digit/0*111/")
+	-> modPath("^/_decimal/_digit/[0-1]+/(.*)", "/$1/7")
+	-> <loopback>;
+decimalEight: PathSubtree("/_decimal/_digit") && PathRegexp("^/_decimal/_digit/0*1000/")
+	-> modPath("^/_decimal/_digit/[0-1]+/(.*)", "/$1/8")
+	-> <loopback>;
+decimalNine: PathSubtree("/_decimal/_digit") && PathRegexp("^/_decimal/_digit/0*1001/")
+	-> modPath("^/_decimal/_digit/[0-1]+/(.*)", "/$1/9")
+	-> <loopback>;
+decimalZeroInitialValue: PathSubtree("/_decimal") && PathRegexp("^/_decimal/d/0+/")
+	-> modPath("^/_decimal/d/[01]+/(.*)", "/$1/0")
+	-> <loopback>;
+decimalZeroValue: PathSubtree("/_decimal") && PathRegexp("^/_decimal/d[0-9]+/0+/")
+	-> modPath("^/_decimal/d([0-9]+)/[01]+/(.*)", "/$2/$1")
+	-> <loopback>;
+decimal: PathSubtree("/_decimal") && PathRegexp("^/_decimal/d[0-9]*/[01]*1[01]*/")
+	-> modPath(
+		"^/_decimal/(d[0-9]*)/([01]+)/(.*)$",
+		"/_div/0/$2/1010/_decimal/_ret0/$3/$1/$2"
+	)
+	-> <loopback>;
+decimalRet0: PathSubtree("/_decimal/_ret0")
+	-> modPath(
+		"^/_decimal/_ret0/(.*)/(d[0-9]*)/([01]+)/([01]+)$",
+		"/_mul/0/$4/1010/_decimal/_ret1/$1/$2/$3/$4"
+	)
+	-> <loopback>;
+decimalRet1: PathSubtree("/_decimal/_ret1")
+	-> modPath(
+		"^/_decimal/_ret1/(.*)/(d[0-9]*)/([01]+)/([01]+)/([01]+)$",
+		"/_sub/$3/$5/_decimal/_ret2/$1/$2/$3/$4"
+	)
+	-> <loopback>;
+decimalRet2: PathSubtree("/_decimal/_ret2")
+	-> modPath(
+		"^/_decimal/_ret2/(.*)/(d[0-9]*)/[01]+/([01]+)/([01]+)$",
+		"/_decimal/_digit/$4/_decimal/_ret3/$1/$2/$3"
+	)
+	-> <loopback>;
+decimalRet3: PathSubtree("/_decimal/_ret3")
+	-> modPath(
+		"^/_decimal/_ret3/(.*)/d([0-9]*)/([01]+)/([0-9])$",
+		"/_decimal/d$4$2/$3/$1"
+	)
+	-> <loopback>;
+
+// This operation uses the debug listener of skipper. The goal is simply to return the path in the response
+// body. The debug listener returns the entire request as JSON, so we can just strip the rest of the response
+// body around the value of the 'uri' field.
+//
+// In addition, the operation trims the leading zeros.
+//
+debugContent: PathSubtree("/_debug-content") -> <shunt>;
+print: PathSubtree("/_print") && PathRegexp("^/_print/([0-9]+|ERR)$")
+	-> sed("\".*", "")
+	-> sed(".*\"incoming\":{[^}]*\"uri\":\"/_debug-content/", "")
+	-> modPath("^/_print/0*", "/_print/")
+	-> modPath("^/_print/$", "/_print/0")
+	-> modPath("^/_print/", "/_debug-content/")
+	-> "http://localhost:9922";
+printDecimalERR: PathSubtree("/_print-decimal") && PathRegexp("^/_print-decimal/ERR$")
+	-> modPath("/_print-decimal/", "/_print/")
+	-> <loopback>;
+printDecimal: PathSubtree("/_print-decimal") && PathRegexp("^/_print-decimal/[01]+$")
+	-> modPath("^/_print-decimal/([01]+)", "/_decimal/d/$1/_print")
+	-> <loopback>;
