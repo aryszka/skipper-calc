@@ -1,7 +1,7 @@
 # skipper-calc
 
 This is a [Skipper](https://github.com/zalando/skipper) routing configuration implementing a basic non-negative
-integer calculator with the inc, dec, add, sub, mul and div operations, all derviced from only inc and dec.
+integer calculator with the inc, dec, add, sub, mul and div operations, all derived from only inc and dec.
 
 See the [`test.sh`](./test.sh) for how it works and what it does.
 
